@@ -27,7 +27,8 @@ Create a Reconciler, which can either take S3/Redshift creds as keyword argument
 ```python
  >>> rec = Reconciler()
   # Or creds
->>> rec = Reconciler(database="mydb", user="myuser", host="mydb.redshift.amazonaws.com")
+>>> rec = Reconciler(database="mydb", user="myuser",
+                     host="mydb.redshift.amazonaws.com")
  ```
 
 Given a start date, end date, and S3 bucket, return the statistics shown above:
