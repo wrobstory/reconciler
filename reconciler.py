@@ -40,10 +40,9 @@ class Reconciler(object):
         port: int
         """
         if aws_access_key_id and aws_secret_access_key:
-            self.s3conn = S3Connection()
+            self.s3conn = S3Connection(aws_access_key_id, aws_secret_access_key)
         else:
-            self.s3conn = S3Connection(aws_access_key_id,
-                                        aws_secret_access_key)
+            self.s3conn = S3Connection()
 
         database = database or os.environ.get('PGDATABASE')
         user = user or os.environ.get('PGUSER')
@@ -59,12 +58,18 @@ class Reconciler(object):
         self.cur = self.conn.cursor()
         self.bucket_cache = {}
 
+    def _get_bucket_from_cache(self, buckpath):
+        """Get bucket from cache, or add to cache if does not exist"""
+        if buckpath not in self.bucket_cache:
+            self.bucket_cache[buckpath] = self.s3conn.get_bucket(buckpath)
+        return self.bucket_cache[buckpath]
+
     def _get_bucket_and_key(self, path):
         """Get top-level bucket and nested key path"""
         if '/' in path:
             parts = path.split('/')
             buckpath = parts[0]
-            keypath = '/'.join(parts[1:])
+            keypath = os.path.join(*parts[1:])
         else:
             buckpath, keypath = path, ""
         return buckpath, keypath
@@ -114,13 +119,10 @@ class Reconciler(object):
         """
         buckpath, keypath = self._get_bucket_and_key(bucket_path)
         print('Getting bucket...')
-        if buckpath not in self.bucket_cache:
-            self.bucket_cache[buckpath] = self.s3conn.get_bucket(buckpath)
-
-        bucket = self.bucket_cache[buckpath]
+        bucket = self._get_bucket_from_cache(buckpath)
 
         print('Getting all keys in bucket...')
-        return {'/'.join(['s3:/', k.bucket.name, k.name])
+        return {os.path.join('s3://', k.bucket.name, k.name)
                 for k in bucket.list(keypath)}
 
     def diff_redshift_and_bucket(self, start_date, end_date, bucket_path):
@@ -153,11 +155,8 @@ class Reconciler(object):
         """Iterate through buckets/keys"""
         for key in keys:
             splitter = key.split('/')
-            bukkit, keyval = splitter[2], '/'.join(splitter[3:])
-            if bukkit not in self.bucket_cache:
-                self.bucket_cache[bukkit] = self.s3conn.get_bucket(bukkit)
-
-            yield self.bucket_cache[bukkit], keyval
+            buckname, keyval = splitter[2], os.path.join(*splitter[3:])
+            yield self._get_bucket_from_cache(buckname), keyval
 
     def copy_committed_keys(self, diff, new_folder):
         """
@@ -165,10 +164,10 @@ class Reconciler(object):
         that have already been committed to a new bucket folder for
         later validation
         """
-        for b, k in self._iter_keys(diff['bucket_keys_already_committed']):
-            new_key = '/'.join([new_folder, k.split('/')[-1]])
+        for buck, k in self._iter_keys(diff['bucket_keys_already_committed']):
+            new_key = os.path.join(new_folder, k.split('/')[-1])
             print("Copying {} to {}...".format(k, new_key))
-            b.copy_key(new_key, b.name, k)
+            buck.copy_key(new_key, buck.name, k)
 
     def delete_committed_keys(self, diff):
         """

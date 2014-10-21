@@ -21,6 +21,11 @@ You use a S3 -> Redshift pipeline for data loads, and need to figure out which o
 
 It also provides a small API for removing or copying keys that have already been committed to Redshift.
 
+Dependencies
+------------
+* psycopg2==2.5.4
+* boto==2.33.0
+
 API
 ---
 Create a Reconciler, which can either take S3/Redshift creds as keyword arguments, or use env :
