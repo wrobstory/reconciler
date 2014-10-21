@@ -101,6 +101,7 @@ class Reconciler(object):
              where xid=q.xid and rtrim("text")='COMMIT')
             and q.starttime between %s and %s
             and l.filename like 's3://%%'
+            and q.querytxt not like '%%CopyManifestJsonAutoNoload%%'
             order by q.starttime desc;
         """
         print('Getting keys already committed to Redshift...')
